@@ -39,6 +39,10 @@ Let `GM="$(git rev-parse --show-toplevel)/bin/glassmith"` (or the installed path
    spec yet, write one to `icon.spec.json` next to a `layers/` dir. The spec
    format is documented in `schema/spec.md`; `examples/demo/` is a complete
    example.
+   - To prototype from an SF Symbol: `"$GM" sf <name> --out layers/symbol.png`.
+     **Warn the user**: Apple's SF Symbols license forbids using a symbol as a
+     real app icon (App Store rejection). It is for mock-ups only; ship original
+     art. See `docs/sf-symbols.md`.
 
 2. **Assemble.** `"$GM" assemble icon.spec.json -o AppIcon.icon`
    Produces a valid bundle. Read back `AppIcon.icon/icon.json` and sanity-check

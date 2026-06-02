@@ -92,6 +92,20 @@ do **not** bake in highlights or shadows — the OS does that.
 Full field reference: [`schema/spec.md`](schema/spec.md) ·
 The underlying format: [`schema/icon-json.md`](schema/icon-json.md).
 
+## Layer sources
+
+Bring your own SVG/PNG layers, or generate one:
+
+```sh
+# render an SF Symbol to a layer (PROTOTYPING ONLY — see the warning below)
+glassmith sf clock.fill --out layers/symbol.png --color "#FFFFFF" --weight semibold
+```
+
+> **⚠️ Don't ship an SF Symbol as your app icon.** Apple's SF Symbols license
+> forbids using symbols (or modified versions) in app icons or logos, and the
+> App Store will reject it. The `sf` source is for fast mock-ups; ship original
+> art. Details: [`docs/sf-symbols.md`](docs/sf-symbols.md).
+
 ## How it works
 
 ```
@@ -126,6 +140,7 @@ ln -s "$PWD/skill/liquid-glass-icon" ~/.claude/skills/liquid-glass-icon
 |---|---|---|
 | Python 3.9+ | assemble, preview | preinstalled on macOS |
 | `rsvg-convert` | preview rasterisation | `brew install librsvg` |
+| Swift / Xcode (optional) | `sf` symbol rendering | Xcode 26+ |
 | Ruby + `xcodeproj` | project integration | ships with CocoaPods, or `gem install xcodeproj` |
 | `actool` (Xcode 26+) | validate / compile | Xcode 26+ |
 

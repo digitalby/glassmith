@@ -7,6 +7,7 @@
 #   compile    <bundle.icon> <out-dir>                     actool -> Assets.car
 #   validate   <bundle.icon>                               actool pre-flight check
 #   integrate  --project P --target T --icon B [--write]   wire into an Xcode project
+#   sf         <symbol> --out layer.png [--color #fff]      render an SF Symbol layer (prototyping)
 #   doctor                                                 check toolchain
 #   demo       [DIR]                                       drop a runnable example
 set -euo pipefail
@@ -19,6 +20,7 @@ case "$cmd" in
   compile)   exec "$HERE/compile.sh" compile "$@" ;;
   validate)  exec "$HERE/compile.sh" validate "$@" ;;
   integrate) exec ruby "$HERE/integrate.rb" "$@" ;;
+  sf)        exec xcrun swift "$HERE/sf_symbol.swift" "$@" ;;
   demo)      exec "$HERE/demo.sh" "$@" ;;
   doctor)
     ok=0
@@ -31,6 +33,6 @@ case "$cmd" in
     if xcrun --find actool >/dev/null 2>&1; then echo "  ok    actool ($(xcrun --find actool))"; else echo "  MISS  actool - install Xcode 26+"; ok=1; fi
     exit $ok ;;
   ""|-h|--help|help)
-    sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//' ;;
+    awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "$0" ;;
   *) echo "unknown command: $cmd (try: glassmith help)" >&2; exit 2 ;;
 esac

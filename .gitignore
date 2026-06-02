@@ -4,6 +4,10 @@ examples/demo/out/
 *.car
 partial*.plist
 
+# SF Symbols: never commit Apple's rendered artwork (license)
+examples/sf-symbol/layers/
+examples/sf-symbol/SFGlass.icon/
+
 # Xcode integration backups
 *.glassmith.bak
 

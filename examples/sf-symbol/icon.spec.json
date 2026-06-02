@@ -1,0 +1,15 @@
+{
+  "name": "SFGlass",
+  "platforms": "shared",
+  "background": { "automatic-gradient": "display-p3:0.16,0.42,0.96,1.0" },
+  "groups": [
+    {
+      "name": "symbol",
+      "specular": true,
+      "lighting": "individual",
+      "layers": [
+        { "name": "glyph", "image": "symbol.png" }
+      ]
+    }
+  ]
+}
