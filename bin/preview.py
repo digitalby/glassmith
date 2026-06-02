@@ -43,24 +43,62 @@ def parse_color(value: str) -> tuple[int, int, int, float]:
     return r, g, b, a
 
 
-def resolve_doc_fill(doc: dict[str, Any], appearance: str) -> tuple[int, int, int, float]:
-    """Resolve the background fill for an appearance, honouring fill-specializations."""
-    base = doc.get("fill")
-    chosen = base
+def lighten(c: tuple[int, int, int, float], f: float) -> tuple[int, int, int, float]:
+    r, g, b, a = c
+    return (round(r + (255 - r) * f), round(g + (255 - g) * f), round(b + (255 - b) * f), a)
+
+
+def darken(c: tuple[int, int, int, float], f: float) -> tuple[int, int, int, float]:
+    r, g, b, a = c
+    return (round(r * (1 - f)), round(g * (1 - f)), round(b * (1 - f)), a)
+
+
+def fill_to_color(fill: Any) -> tuple[int, int, int, float] | None:
+    """A document/spec fill value -> rgba, or None if it carries no explicit colour."""
+    if fill is None:
+        return None
+    if isinstance(fill, dict):
+        col = fill.get("solid") or fill.get("automatic-gradient")
+        return parse_color(col) if col else None
+    if fill == "system-dark":
+        return (28, 28, 30, 1.0)
+    if fill == "system-light":
+        return (242, 242, 247, 1.0)
+    return None  # "automatic" -> let the appearance decide
+
+
+def spec_fill(doc: dict[str, Any], appearance: str) -> Any:
     for spec in doc.get("fill-specializations", []) or []:
         if spec.get("appearance") == appearance and spec.get("idiom") is None:
-            chosen = spec["value"]
-    # tinted: the OS renders monochrome on a dark base; default to near-black.
-    if chosen is None:
-        return (15, 15, 18, 1.0) if appearance in ("dark", "tinted") else (245, 245, 247, 1.0)
-    if isinstance(chosen, dict):
-        col = chosen.get("solid") or chosen.get("automatic-gradient")
-        return parse_color(col) if col else (15, 15, 18, 1.0)
-    if chosen == "system-dark":
-        return (15, 15, 18, 1.0)
-    if chosen == "system-light":
-        return (245, 245, 247, 1.0)
-    return (15, 15, 18, 1.0) if appearance in ("dark", "tinted") else (245, 245, 247, 1.0)
+            return spec["value"]
+    return None
+
+
+# How each appearance treats the icon. `backdrop_replaces` means the OS supplies
+# the background and the artist's own background fill is dropped (tinted, clear).
+APPEARANCE = {
+    "light": {"mono": False, "alpha": 1.0, "specular": 1.0, "backdrop_replaces": None},
+    "dark": {"mono": False, "alpha": 1.0, "specular": 1.0, "backdrop_replaces": None},
+    "tinted": {"mono": True, "alpha": 1.0, "specular": 0.7, "backdrop_replaces": (22, 22, 24, 1.0)},
+    "clear": {"mono": True, "alpha": 0.55, "specular": 1.7, "backdrop_replaces": (70, 74, 82, 1.0)},
+}
+
+
+def appearance_bg(doc: dict[str, Any], appearance: str) -> tuple[int, int, int, float]:
+    """Resolve the background for an appearance, faithfully to how iOS composites."""
+    cfg = APPEARANCE[appearance]
+    if cfg["backdrop_replaces"] is not None and spec_fill(doc, appearance) is None:
+        # tinted / clear: the system supplies a neutral backdrop; icon bg is dropped.
+        return cfg["backdrop_replaces"]
+    explicit = fill_to_color(spec_fill(doc, appearance))
+    if explicit is not None:
+        return explicit
+    base = fill_to_color(doc.get("fill"))
+    if base is None:
+        return (242, 242, 247, 1.0) if appearance == "light" else (20, 20, 22, 1.0)
+    if appearance == "dark":  # no explicit dark variant: derive one by darkening.
+        return darken(base, 0.5)
+    return base
 
 
 def data_uri(path: Path) -> str:
@@ -69,7 +107,7 @@ def data_uri(path: Path) -> str:
     return f"data:{mime};base64,{b64}"
 
 
-def layer_svg(layer: dict[str, Any], assets: Path, size: int, appearance: str) -> str:
+def layer_svg(layer: dict[str, Any], assets: Path, size: int, mono: bool) -> str:
     name = layer.get("image-name")
     src = assets / name
     if not src.is_file():
@@ -78,53 +116,50 @@ def layer_svg(layer: dict[str, Any], assets: Path, size: int, appearance: str) -
     pos = layer.get("position", {})
     scale = float(pos.get("scale", 1.0))
     tx, ty = (pos.get("translation-in-points", [0.0, 0.0]) + [0.0, 0.0])[:2]
-    # centre-anchored scale + translate
-    off = (size - size * scale) / 2
+    off = (size - size * scale) / 2  # centre-anchored scale + translate
     transform = f"translate({off + tx},{off + ty}) scale({scale})"
-    flt = ' filter="url(#tint)"' if appearance == "tinted" else ""
+    flt = ' filter="url(#mono)"' if mono else ""
     return (f'<g transform="{transform}" opacity="{opacity}"{flt}>'
             f'<image href="{data_uri(src)}" x="0" y="0" width="{size}" height="{size}" '
             f'preserveAspectRatio="xMidYMid meet"/></g>')
 
 
 def build_svg(doc: dict[str, Any], assets: Path, size: int, appearance: str) -> str:
-    r, g, b, a = resolve_doc_fill(doc, appearance)
+    cfg = APPEARANCE[appearance]
+    r, g, b, a = appearance_bg(doc, appearance)
     radius = size * CORNER_RATIO
-    parts: list[str] = []
-    parts.append(f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
-                 f'viewBox="0 0 {size} {size}">')
-    # tinted: desaturate every layer to luminance, then re-tint toward white.
-    parts.append(
+    spec_alpha = 0.35 * cfg["specular"]
+    parts: list[str] = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
+        f'viewBox="0 0 {size} {size}">',
+        # mono: luminance grayscale (tinted/clear). Bright art stays bright, dark recedes.
         '<defs>'
         f'<clipPath id="squircle"><rect x="0" y="0" width="{size}" height="{size}" '
         f'rx="{radius:.2f}" ry="{radius:.2f}"/></clipPath>'
-        '<filter id="tint"><feColorMatrix type="saturate" values="0"/>'
-        '<feComponentTransfer><feFuncR type="linear" slope="0.85" intercept="0.15"/>'
-        '<feFuncG type="linear" slope="0.85" intercept="0.15"/>'
-        '<feFuncB type="linear" slope="0.85" intercept="0.15"/></feComponentTransfer></filter>'
-        '<radialGradient id="specular" cx="0.32" cy="0.26" r="0.85">'
-        '<stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/>'
-        '<stop offset="45%" stop-color="#ffffff" stop-opacity="0.06"/>'
+        '<filter id="mono"><feColorMatrix type="matrix" '
+        'values="0.33 0.5 0.16 0 0  0.33 0.5 0.16 0 0  0.33 0.5 0.16 0 0  0 0 0 1 0"/></filter>'
+        f'<radialGradient id="bg" cx="0.4" cy="0.32" r="0.95">'
+        f'<stop offset="0%" stop-color="rgb{lighten((r,g,b,a),0.14)[:3]}"/>'
+        f'<stop offset="100%" stop-color="rgb({r},{g},{b})"/></radialGradient>'
+        '<radialGradient id="specular" cx="0.30" cy="0.24" r="0.9">'
+        f'<stop offset="0%" stop-color="#ffffff" stop-opacity="{spec_alpha:.2f}"/>'
+        f'<stop offset="45%" stop-color="#ffffff" stop-opacity="{spec_alpha * 0.18:.2f}"/>'
         '<stop offset="100%" stop-color="#ffffff" stop-opacity="0"/></radialGradient>'
-        '</defs>')
-    parts.append(f'<g clip-path="url(#squircle)">')
-    parts.append(f'<rect x="0" y="0" width="{size}" height="{size}" '
-                 f'fill="rgb({r},{g},{b})" fill-opacity="{a}"/>')
-    any_specular = False
+        '</defs>',
+        '<g clip-path="url(#squircle)">',
+        f'<rect x="0" y="0" width="{size}" height="{size}" fill="url(#bg)" fill-opacity="{a}"/>',
+    ]
     for group in doc.get("groups", []):
         if group.get("hidden"):
             continue
-        gopacity = float(group.get("opacity", 1.0))
+        gopacity = float(group.get("opacity", 1.0)) * cfg["alpha"]
         parts.append(f'<g opacity="{gopacity}">')
         for layer in group.get("layers", []):
             if layer.get("hidden"):
                 continue
-            parts.append(layer_svg(layer, assets, size, appearance))
+            parts.append(layer_svg(layer, assets, size, cfg["mono"]))
         parts.append('</g>')
-        any_specular = any_specular or bool(group.get("specular"))
-    # clear/glass + specular groups: soft top-left highlight to read as glass.
-    if any_specular or appearance == "clear":
-        parts.append(f'<rect x="0" y="0" width="{size}" height="{size}" fill="url(#specular)"/>')
+    parts.append(f'<rect x="0" y="0" width="{size}" height="{size}" fill="url(#specular)"/>')
     parts.append('</g></svg>')
     return "".join(parts)
 
