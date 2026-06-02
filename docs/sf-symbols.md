@@ -25,15 +25,18 @@ So treat this source as **prototyping only**:
 
 - ✅ Mock up layout, background, colour and the glass treatment fast.
 - ✅ Explore depth/specular before commissioning real art.
-- ❌ Do not commit Apple's rendered symbol pixels to a repo you publish.
+- ✅ Show a rendered symbol in docs/marketing to *illustrate the tool* (the
+  README hero does this) — that's the common, accepted use.
 - ❌ Do not submit an SF-Symbol-derived icon to the App Store.
 
 For the shipped icon, draw original artwork (see `examples/demo/` for a fully
 original clip-art clock) and feed that through the same pipeline.
 
-## Why glassmith doesn't bundle a rendered symbol
+## What this repo commits, and what it doesn't
 
-The `examples/sf-symbol/` example references `layers/symbol.png` but does **not**
-commit it (it's git-ignored). You generate it locally with the `sf` command. That
-keeps Apple's artwork out of this MIT-licensed repo and keeps the example honest
-about the restriction above.
+- The README hero is a **composited illustration** of an SF Symbol on glass —
+  fine as documentation of what the tool does.
+- The `examples/sf-symbol/` example references `layers/symbol.png` but does
+  **not** commit the raw layer (it's git-ignored). You generate it locally with
+  the `sf` command, so the bare Apple glyph asset isn't redistributed here and
+  the example stays honest about the restriction above.

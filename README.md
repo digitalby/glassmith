@@ -9,7 +9,9 @@
 [![Toolchain](https://img.shields.io/badge/Xcode-26%2B-black.svg)](https://developer.apple.com/xcode/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-<img src="docs/assets/preview-strip.png" alt="light / dark / tinted / clear previews of a demo icon" width="760">
+<img src="docs/assets/preview-strip.png" alt="light / dark / tinted / clear previews of an SF Symbol on Liquid Glass" width="760">
+
+<sub><em>Illustrative: an SF Symbol (`clock.fill`) on Liquid Glass, previewed across appearances. SF Symbols are great for prototyping — but <a href="docs/sf-symbols.md">don't ship one as a real app icon</a>.</em></sub>
 
 </div>
 
@@ -66,6 +68,11 @@ bin/glassmith integrate --project App.xcodeproj --target App --icon AppIcon.icon
 
 A small, ergonomic JSON that maps onto `icon.json`. You provide flat layers; you
 do **not** bake in highlights or shadows — the OS does that.
+
+<div align="center">
+<img src="docs/assets/clock-strip.png" alt="original clip-art clock across appearances" width="680">
+<br><sub><em>Original artwork (no Apple assets): the bundled <code>examples/demo</code> clip-art clock.</em></sub>
+</div>
 
 ```json
 {
