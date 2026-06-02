@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# glassmith - forge iOS 26 Liquid Glass app icons from layered source.
+#
+# Subcommands:
+#   assemble   <spec.json> [-o out.icon] [--layers DIR]   spec + layers -> .icon
+#   preview    <bundle.icon> [-o DIR]                      light/dark/tinted/clear PNGs
+#   compile    <bundle.icon> <out-dir>                     actool -> Assets.car
+#   validate   <bundle.icon>                               actool pre-flight check
+#   integrate  --project P --target T --icon B [--write]   wire into an Xcode project
+#   doctor                                                 check toolchain
+#   demo       [DIR]                                       drop a runnable example
+set -euo pipefail
+HERE=$(cd "$(dirname "$0")" && pwd)
+
+cmd=${1:-}; shift || true
+case "$cmd" in
+  assemble)  exec python3 "$HERE/assemble.py" "$@" ;;
+  preview)   exec python3 "$HERE/preview.py" "$@" ;;
+  compile)   exec "$HERE/compile.sh" compile "$@" ;;
+  validate)  exec "$HERE/compile.sh" validate "$@" ;;
+  integrate) exec ruby "$HERE/integrate.rb" "$@" ;;
+  demo)      exec "$HERE/demo.sh" "$@" ;;
+  doctor)
+    ok=0
+    check() { if command -v "$1" >/dev/null 2>&1; then echo "  ok    $1 ($2)"; else echo "  MISS  $1 - $2"; ok=1; fi; }
+    echo "glassmith doctor:"
+    check python3 "assemble + preview"
+    check rsvg-convert "preview rasterisation (brew install librsvg)"
+    check ruby "integrate"
+    if ruby -e 'require "xcodeproj"' >/dev/null 2>&1; then echo "  ok    xcodeproj gem (integrate)"; else echo "  MISS  xcodeproj gem - gem install xcodeproj"; ok=1; fi
+    if xcrun --find actool >/dev/null 2>&1; then echo "  ok    actool ($(xcrun --find actool))"; else echo "  MISS  actool - install Xcode 26+"; ok=1; fi
+    exit $ok ;;
+  ""|-h|--help|help)
+    sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) echo "unknown command: $cmd (try: glassmith help)" >&2; exit 2 ;;
+esac

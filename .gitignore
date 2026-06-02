@@ -1,0 +1,16 @@
+# build / scratch output
+examples/demo/out/
+**/.previews/
+*.car
+partial*.plist
+
+# Xcode integration backups
+*.glassmith.bak
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/

@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  demo:
+    name: assemble + preview + validate the demo
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: sudo xcode-select -s /Applications/Xcode_26.app || sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | tail -1)"
+
+      - name: Install librsvg
+        run: brew install librsvg
+
+      - name: Install xcodeproj gem
+        run: gem install xcodeproj --no-document
+
+      - name: Doctor
+        run: bin/glassmith doctor
+
+      - name: Assemble
+        run: bin/glassmith assemble examples/demo/icon.spec.json -o /tmp/DemoClock.icon
+
+      - name: Preview
+        run: bin/glassmith preview /tmp/DemoClock.icon -o /tmp/previews --size 512
+
+      - name: Validate with actool
+        run: bin/glassmith validate /tmp/DemoClock.icon
+
+      - name: Upload previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-previews
+          path: /tmp/previews
